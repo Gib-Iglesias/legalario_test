@@ -29,7 +29,7 @@ class AdvancedScraper(WikipediaScraper):
                 # Extraer todo el contenido
                 content = page.evaluate("""
                     () => {
-                        const content = document.querySelector('.mw-parser-output');
+                        const content = document.querySelector('.mw-content-container');
                         if (!content) return null;
                         
                         // Extraer todos los párrafos

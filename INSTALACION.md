@@ -91,7 +91,6 @@ REDIS_URL=redis://localhost:6379/0
 OPENAI_API_KEY=mock  # o tu API key real
 ```
 
-**Nota:** El sistema funciona perfectamente con SQLite y modo mock de OpenAI.
 
 ### Paso 1.6: Verificar instalación
 
