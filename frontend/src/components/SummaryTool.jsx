@@ -55,7 +55,7 @@ function SummaryTool() {
   return (
     <div className="card summary-tool">
       <h2>🤖 Asistente de Resumen con IA</h2>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="text">Texto a resumir</label>
@@ -64,7 +64,8 @@ function SummaryTool() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Escribe o pega el texto que quieres resumir..."
-            rows={8}
+            rows={10}
+            style={{ fontSize: '14px', height: '200px' }}
             required
             minLength={10}
           />

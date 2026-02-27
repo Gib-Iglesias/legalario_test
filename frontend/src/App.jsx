@@ -109,7 +109,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="container">
-          <h1>💰 Transactions App</h1>
+          <h1>💰 Transactions App ( Legalario Test )</h1>
           <WebSocketStatus isConnected={isConnected} />
         </div>
       </header>
