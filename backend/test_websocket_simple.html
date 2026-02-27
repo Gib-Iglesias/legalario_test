@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Test - Transacciones</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      h1 {
+        color: #333;
+        margin-top: 0;
+      }
+      .status {
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+        font-weight: bold;
+      }
+      .status.connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status.disconnected {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .log {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: "Courier New", monospace;
+        font-size: 13px;
+      }
+      .log-entry {
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 3px;
+      }
+      .log-entry.info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      .log-entry.success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .log-entry.warning {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .log-entry.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .notification {
+        background: #e7f3ff;
+        border-left: 4px solid #007bff;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+      }
+      .notification strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+      input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔌 WebSocket Test - Transacciones en Tiempo Real</h1>
+
+      <div id="status" class="status disconnected">❌ Desconectado</div>
+
+      <div style="margin-bottom: 20px">
+        <input type="text" id="userId" placeholder="User ID (opcional)" />
+        <button id="connectBtn" onclick="connect()">Conectar</button>
+        <button id="disconnectBtn" onclick="disconnect()" disabled>
+          Desconectar
+        </button>
+        <button onclick="clearLog()">Limpiar Log</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <h2>📊 Notificaciones</h2>
+      <div id="notifications"></div>
+    </div>
+
+    <div class="container">
+      <h2>📝 Log de Eventos</h2>
+      <div id="log" class="log"></div>
+    </div>
+
+    <script>
+      let ws = null;
+      const statusDiv = document.getElementById("status");
+      const logDiv = document.getElementById("log");
+      const notificationsDiv = document.getElementById("notifications");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const userIdInput = document.getElementById("userId");
+
+      function addLog(message, type = "info") {
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        const timestamp = new Date().toLocaleTimeString();
+        entry.textContent = `[${timestamp}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function updateStatus(connected) {
+        if (connected) {
+          statusDiv.className = "status connected";
+          statusDiv.textContent = "✅ Conectado";
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+        } else {
+          statusDiv.className = "status disconnected";
+          statusDiv.textContent = "❌ Desconectado";
+          connectBtn.disabled = false;
+          disconnectBtn.disabled = true;
+        }
+      }
+
+      function addNotification(data) {
+        const notification = document.createElement("div");
+        notification.className = "notification";
+
+        const tx = data.data;
+        const statusEmoji =
+          tx.estado === "procesado"
+            ? "✅"
+            : tx.estado === "fallido"
+              ? "❌"
+              : "⏳";
+
+        notification.innerHTML = `
+                <strong>${statusEmoji} Transacción #${tx.id} - ${tx.estado.toUpperCase()}</strong>
+                <div>Usuario: ${tx.user_id}</div>
+                <div>Monto: $${tx.monto} - Tipo: ${tx.tipo}</div>
+                <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                    ${data.timestamp}
+                </div>
+            `;
+
+        notificationsDiv.insertBefore(
+          notification,
+          notificationsDiv.firstChild,
+        );
+
+        // Limitar a 10 notificaciones
+        while (notificationsDiv.children.length > 10) {
+          notificationsDiv.removeChild(notificationsDiv.lastChild);
+        }
+      }
+
+      function connect() {
+        const userId = userIdInput.value.trim();
+        let url = "ws://localhost:8000/transactions/stream";
+
+        if (userId) {
+          url += `?user_id=${userId}`;
+          addLog(`Conectando con filtro de usuario: ${userId}`, "info");
+        } else {
+          addLog("Conectando sin filtro de usuario", "info");
+        }
+
+        ws = new WebSocket(url);
+
+        ws.onopen = () => {
+          addLog("Conexión WebSocket establecida", "success");
+          updateStatus(true);
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "connection_established") {
+            addLog(`✓ ${data.message}`, "success");
+          } else if (data.type === "transaction_update") {
+            const tx = data.data;
+            addLog(`🔔 Transacción #${tx.id}: ${tx.estado}`, "warning");
+            addNotification(data);
+          } else if (data.type === "pong") {
+            addLog("🏓 Pong recibido", "info");
+          }
+        };
+
+        ws.onerror = (error) => {
+          addLog("Error en WebSocket: " + error, "error");
+        };
+
+        ws.onclose = () => {
+          addLog("Conexión WebSocket cerrada", "warning");
+          updateStatus(false);
+          ws = null;
+        };
+      }
+
+      function disconnect() {
+        if (ws) {
+          ws.close();
+          addLog("Desconectando...", "info");
+        }
+      }
+
+      function clearLog() {
+        logDiv.innerHTML = "";
+        addLog("Log limpiado", "info");
+      }
+
+      // Ping cada 30 segundos para mantener la conexión
+      setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send("ping");
+        }
+      }, 30000);
+
+      addLog('Página cargada. Haz clic en "Conectar" para iniciar.', "info");
+    </script>
+  </body>
+</html>
